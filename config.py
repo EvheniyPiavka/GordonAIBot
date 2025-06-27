@@ -11,6 +11,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 SUBSCRIPTIONS_FILE = BASE_DIR / "subscriptions.json"
 ANSWERS_FILE = BASE_DIR / "answers.json"
+QUESTIONS_FILE = BASE_DIR / "questions.json"
 
 # GPT
 MAX_HISTORY_LEN = 10

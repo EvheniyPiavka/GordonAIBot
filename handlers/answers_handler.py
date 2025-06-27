@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.ext import CallbackContext, CommandHandler
 
 from storage import get_answers, save_answers
-from utils import next_quote_id
+from utils import next_answer_id
 
 answers = get_answers()
 
@@ -27,7 +27,7 @@ async def add_answer(update: Update, _: CallbackContext):
     if not text:
         await update.message.reply_text("Використання: /addanswer <фраза>")
         return
-    q = {"id": next_quote_id(answers), "text": text}
+    q = {"id": next_answer_id(answers), "text": text}
     answers.append(q);
     save_answers(answers)
     await update.message.reply_text(f"✅ Додано ID {q['id']}")
