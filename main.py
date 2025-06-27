@@ -9,26 +9,9 @@ from telegram import Update
 from telegram.constants import MessageEntityType
 from telegram.ext import Application, MessageHandler, CommandHandler, filters, CallbackContext, JobQueue
 
-quotes = [
-    "Непонімаю",
-    "Буде видно",
-    "Всмислі, як?",
-    "На мазду схоже",
-    "Ми не люди, ми довбойоби",
-    "Пробував туди пензлика свого вставить?",
-    "Хто?",
-    "Чого?",
-    "+",
-    "-",
-    "ок",
-    "ясно",
-    "Подивимось",
-    "Куплю вишневого садочку і оставлю з сахаром",
-    "У мене горобчик з'явився"
-]
-
 
 SUBSCRIPTIONS_FILE = "subscriptions.json"
+ANSWERS_FILE = "answers.json"
 
 chat_histories = {}  # {chat_id: List[Dict[str, str]]}
 MAX_HISTORY_LENGTH = 10
@@ -47,6 +30,23 @@ def save_subscribed_chats():
         json.dump(list(subscribed_chats), file)
 
 subscribed_chats = load_subscribed_chats()
+
+def load_answers() -> list[dict]:
+    try:
+        with open(ANSWERS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+def save_answers(data: list[dict]) -> None:
+    with open(ANSWERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+answers: list[dict] = load_answers()
+
+def next_quote_id() -> int:
+    return max((q["id"] for q in answers), default=0) + 1
 
 def ends_with_question_no_space(text):
     return bool(re.search(r'[^ ]\?$', text))
@@ -67,7 +67,7 @@ async def handle_text_message(update: Update, context: CallbackContext) -> None:
     if is_mentioned(update, context):
         await respond_with_gpt(update, context)
     elif ends_with_question_no_space(text):
-        response = random.choice(quotes)
+        response = random.choice(answers)["text"]
         await update.message.reply_text(response)
 
 async def daily_message(context: CallbackContext) -> None:
@@ -111,6 +111,44 @@ async def debug_jobs(update: Update, context: CallbackContext) -> None:
         )
 
     await update.message.reply_text("\n\n".join(messages), parse_mode="HTML")
+
+async def list_answers(update: Update, _: CallbackContext) -> None:
+    if not answers:
+        await update.message.reply_text("Список порожній 🚫")
+        return
+    text = "\n".join(f"{q['id']}. {q['text']}" for q in answers)
+    await update.message.reply_text(text)
+
+async def add_answer(update: Update, _: CallbackContext) -> None:
+    new_text = update.message.text.partition(" ")[2].strip()
+    if not new_text:
+        await update.message.reply_text(
+            "Пришли фразу після команди, напр.: `/addanswer Привіт!`",
+            parse_mode="Markdown"
+        )
+        return
+    answer = {"id": next_quote_id(), "text": new_text}
+    answers.append(answer)
+    save_answers(answers)
+    await update.message.reply_text(f"✅ Додано (ID {answer['id']}): «{answer['text']}»")
+
+async def del_answer(update: Update, _: CallbackContext) -> None:
+    arg = update.message.text.partition(" ")[2].strip()
+    if not arg.isdigit():
+        await update.message.reply_text(
+            "Вкажи ID із `/listanswers`, напр.: `/delanswer 7`",
+            parse_mode="Markdown"
+        )
+        return
+    qid = int(arg)
+    for q in answers:
+        if q["id"] == qid:
+            answers.remove(q)
+            save_answers(answers)
+            await update.message.reply_text(f"🗑 Видалено: «{q['text']}»")
+            break
+    else:
+        await update.message.reply_text("Такого ID нема 🤷")
 
 async def ask_chatgpt_with_history(chat_id: int, prompt: str) -> str:
     history = chat_histories.get(chat_id, [])
@@ -199,6 +237,10 @@ def main():
     app.add_handler(CommandHandler("stopdaily", stop_daily))
     app.add_handler(CommandHandler("debugjobs", debug_jobs))
     app.add_handler(CommandHandler("play", survey))
+
+    app.add_handler(CommandHandler("listanswers", list_answers))
+    app.add_handler(CommandHandler("addanswer", add_answer))
+    app.add_handler(CommandHandler("delanswer", del_answer))
 
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
