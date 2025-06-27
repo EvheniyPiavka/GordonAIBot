@@ -5,6 +5,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+answers.json
+subscriptions.json
+questions.json
+
 # C extensions
 *.so
 
