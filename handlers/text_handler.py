@@ -9,8 +9,6 @@ from stats import increment
 from storage import get_answers
 from utils import ends_with_question_no_space
 
-answers = get_answers()
-
 
 def register(app):
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
@@ -23,7 +21,7 @@ async def handle_text(update: Update, context: CallbackContext):
         await ask_chatgpt_with_history(update, context)
     elif ends_with_question_no_space(txt):
         increment(update.effective_chat.id, update.effective_user.id)
-        await update.message.reply_text(random.choice(answers)["text"])
+        await update.message.reply_text(random.choice(get_answers())["text"])
 
 
 def _is_mentioned(update: Update, ctx) -> bool:
